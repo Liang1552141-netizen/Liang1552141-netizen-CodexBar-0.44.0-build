@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - "CodexBar-0.44.0-source.zip"
+      - ".github/workflows/main.yml"
 
 permissions:
   contents: read
@@ -17,7 +18,7 @@ jobs:
 
     steps:
       - name: 检出构建仓库
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 检查源码压缩包
         shell: pwsh
@@ -30,7 +31,7 @@ jobs:
         shell: pwsh
         run: |
           corepack enable
-          corepack prepare pnpm@latest --activate
+          corepack prepare pnpm@10.18.1 --activate
           pnpm --version
 
       - name: 安装 Inno Setup
@@ -42,6 +43,18 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force source | Out-Null
           Expand-Archive -LiteralPath "CodexBar-0.44.0-source.zip" -DestinationPath source
+          $providersPath = "source\rust\src\providers\mod.rs"
+          $providers = Get-Content $providersPath -Raw
+          if ($providers -notmatch 'pub use codex::\{CodexApi, CodexProvider\};') {
+            $providers = $providers.Replace(
+              'pub use codex::CodexProvider;',
+              'pub use codex::{CodexApi, CodexProvider};'
+            )
+            Set-Content -LiteralPath $providersPath -Value $providers -Encoding utf8NoBOM
+          }
+          if ((Get-Content $providersPath -Raw) -notmatch 'pub use codex::\{CodexApi, CodexProvider\};') {
+            throw "CodexApi 导出修复未生效。"
+          }
           git -C source init --quiet
           git -C source add --force --all
           git -C source -c user.name="CodexBar Build" -c user.email="build@localhost" commit --quiet -m "CodexBar 0.44.0 source"
@@ -53,6 +66,15 @@ jobs:
           $workRoot = Join-Path $env:GITHUB_WORKSPACE "build"
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "source\scripts\windows-release-build.ps1" -Ref "HEAD" -RepoUrl $sourcePath -WorkRoot $workRoot
           if ($LASTEXITCODE -ne 0) { throw "Windows 发布构建失败，退出码：$LASTEXITCODE" }
+
+      - name: 构建失败时保存诊断日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodexBar-0.44.0-build-logs
+          path: build/assets/*.log
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: 检查构建产物
         shell: pwsh
