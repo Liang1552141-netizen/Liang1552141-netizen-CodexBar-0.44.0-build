@@ -30,7 +30,7 @@ jobs:
         shell: pwsh
         run: |
           corepack enable
-          corepack prepare pnpm@10.18.1 --activate
+          corepack prepare pnpm@latest --activate
           pnpm --version
 
       - name: 安装 Inno Setup
