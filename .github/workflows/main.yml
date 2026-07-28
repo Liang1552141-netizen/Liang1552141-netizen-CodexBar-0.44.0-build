@@ -1,0 +1,77 @@
+name: 构建 CodexBar Windows 安装包
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "CodexBar-0.44.0-source.zip"
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Windows 云端构建
+    runs-on: windows-2022
+    timeout-minutes: 60
+
+    steps:
+      - name: 检出构建仓库
+        uses: actions/checkout@v4
+
+      - name: 检查源码压缩包
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "CodexBar-0.44.0-source.zip")) {
+            throw "缺少 CodexBar-0.44.0-source.zip，请先上传到仓库根目录。"
+          }
+
+      - name: 安装 pnpm
+        shell: pwsh
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+          pnpm --version
+
+      - name: 安装 Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: 解压源码并初始化构建仓库
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force source | Out-Null
+          Expand-Archive -LiteralPath "CodexBar-0.44.0-source.zip" -DestinationPath source
+          git -C source init --quiet
+          git -C source add --force --all
+          git -C source -c user.name="CodexBar Build" -c user.email="build@localhost" commit --quiet -m "CodexBar 0.44.0 source"
+
+      - name: 构建安装版和便携版
+        shell: pwsh
+        run: |
+          $sourcePath = (Resolve-Path "source").Path
+          $workRoot = Join-Path $env:GITHUB_WORKSPACE "build"
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "source\scripts\windows-release-build.ps1" -Ref "HEAD" -RepoUrl $sourcePath -WorkRoot $workRoot
+          if ($LASTEXITCODE -ne 0) { throw "Windows 发布构建失败，退出码：$LASTEXITCODE" }
+
+      - name: 检查构建产物
+        shell: pwsh
+        run: |
+          $expected = @(
+            "build\assets\CodexBar-0.44.0-Setup.exe",
+            "build\assets\CodexBar-0.44.0-Setup.exe.sha256",
+            "build\assets\CodexBar-0.44.0-portable.exe",
+            "build\assets\CodexBar-0.44.0-portable.exe.sha256"
+          )
+          foreach ($path in $expected) {
+            if (-not (Test-Path $path)) { throw "缺少构建产物：$path" }
+          }
+          Get-ChildItem "build\assets" | Format-Table Name, Length
+
+      - name: 上传安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodexBar-0.44.0-Windows
+          path: build/assets/*
+          if-no-files-found: error
+          retention-days: 7
