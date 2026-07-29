@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "CodexBar-0.44.0-source.zip
+      - "CodexBar-0.44.0-source.zip"
       - ".github/workflows/main.yml"
 
 permissions:
