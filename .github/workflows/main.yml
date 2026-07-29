@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "CodexBar-0.44.0-source.zip"
+      - "CodexBar-0.44.0-source (1).zip"
       - ".github/workflows/main.yml"
 
 permissions:
@@ -23,8 +23,8 @@ jobs:
       - name: 检查源码压缩包
         shell: pwsh
         run: |
-          if (-not (Test-Path "CodexBar-0.44.0-source.zip")) {
-            throw "缺少 CodexBar-0.44.0-source.zip，请先上传到仓库根目录。"
+          if (-not (Test-Path "CodexBar-0.44.0-source (1).zip")) {
+            throw "缺少 CodexBar-0.44.0-source (1).zip，请先上传到仓库根目录。"
           }
 
       - name: 安装 pnpm
@@ -42,7 +42,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force source | Out-Null
-          Expand-Archive -LiteralPath "CodexBar-0.44.0-source.zip" -DestinationPath source
+          Expand-Archive -LiteralPath "CodexBar-0.44.0-source (1).zip" -DestinationPath source
           $providersPath = "source\rust\src\providers\mod.rs"
           $providers = Get-Content $providersPath -Raw
           if ($providers -notmatch 'pub use codex::\{CodexApi, CodexProvider\};') {
